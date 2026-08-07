@@ -17,6 +17,13 @@ class ChatBot implements Agent, Conversational, HasTools
     /**
      * Get the instructions that the agent should follow.
      */
+    protected array $messages = [];
+
+    public function __construct(array $messages = [])
+    {
+        $this->messages = $messages;
+    }
+
     public function instructions(): Stringable|string
     {
         return 'You are rihana and you a helpful assistant.';
@@ -28,9 +35,9 @@ class ChatBot implements Agent, Conversational, HasTools
      * @return Message[]
      */
     public function messages(): iterable
-    {
-        return [];
-    }
+{
+    return $this->messages;
+}
 
     /**
      * Get the tools available to the agent.

@@ -51,24 +51,93 @@
         </main>
 
         <!-- Input -->
-        <footer class="bg-white border-t p-4">
+        <!-- Footer Modern ChatGPT Style -->
+<footer class="bg-white border-t border-slate-200 p-4">
 
-            <div class="flex gap-3">
-                <input
-                    id="chatInput"
-                    type="text"
-                    placeholder="Type your message..."
-                    class="flex-1 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500">
+    <!-- Preview File -->
+    <div id="previewArea" class="hidden mb-3"></div>
+
+    <!-- Input Container -->
+    <div class="relative bg-white border border-slate-300 rounded-3xl shadow-sm hover:shadow-md transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 px-3 py-2">
+
+        <div class="flex items-center gap-2">
+
+            <!-- Plus Button -->
+            <div class="relative">
 
                 <button
-                    id="sendButton"
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-xl transition">
-                    Send
+                    id="uploadButton"
+                    type="button"
+                    class="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-2xl text-slate-600 transition">
+                    +
                 </button>
+
+                <!-- Upload Menu -->
+                <div
+                    id="uploadMenu"
+                    class="hidden absolute bottom-14 left-0 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50">
+
+                    <label for="imageInput"
+                        class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm">
+                        <span class="text-lg">🖼️</span>
+                        <span>Upload Image</span>
+                    </label>
+
+                    <label for="fileInput"
+                        class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm">
+                        <span class="text-lg">📄</span>
+                        <span>Upload File</span>
+                    </label>
+
+                    <label for="audioInput"
+                        class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm">
+                        <span class="text-lg">🎵</span>
+                        <span>Upload Audio</span>
+                    </label>
+
+                </div>
 
             </div>
 
-        </footer>
+            <!-- Hidden Inputs -->
+            <input id="imageInput" type="file" accept="image/*" class="hidden">
+            <input id="fileInput" type="file" accept=".pdf,.doc,.docx,.txt" class="hidden">
+            <input id="audioInput" type="file" accept="audio/*" class="hidden">
+
+            <!-- Text Input -->
+            <input
+                id="chatInput"
+                type="text"
+                placeholder="Message Rihana AI..."
+                class="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-slate-800 placeholder:text-slate-400 text-[15px] px-1 py-2">
+
+            <!-- Voice Button -->
+            <button
+                id="voiceButton"
+                type="button"
+                class="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-lg text-slate-600 transition">
+                🎤
+            </button>
+
+            <!-- Send Button -->
+            <button
+                id="sendButton"
+                type="button"
+                class="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-md transition-all duration-200 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7-7 7"/>
+                </svg>
+            </button>
+
+        </div>
+
+    </div>
+
+    <p class="text-xs text-center text-slate-400 mt-2">
+        Rihana AI can make mistakes. Check important information.
+    </p>
+
+</footer>
 
     </div>
 
@@ -180,7 +249,19 @@ input.addEventListener("keypress",(e)=>{
         sendMessage();
     }
 });
+const uploadButton = document.getElementById('uploadButton');
+const uploadMenu = document.getElementById('uploadMenu');
 
+uploadButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    uploadMenu.classList.toggle('hidden');
+});
+
+document.addEventListener('click', (e) => {
+    if (!uploadButton.contains(e.target) && !uploadMenu.contains(e.target)) {
+        uploadMenu.classList.add('hidden');
+    }
+});
 </script>
 
 </body>

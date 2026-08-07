@@ -7,10 +7,13 @@ Route::get('/', function () {
     return view('welcome');
 });
 Route::get('/gemini', function(){
+
     $response = \Laravel\Ai\agent(
-        instructions: "your asistant helpful"
-    )->prompt("berikan saya pantun yang ber irama mengenai error");
-    return $response;
+        instructions: "your assistant helpful"
+    )->prompt("berikan saya pantun yang berirama mengenai error");
+
+    return (string) $response;
+
 });
 
 Route::get('/chat', [AIChatBot::class, 'index'])->name('chat');

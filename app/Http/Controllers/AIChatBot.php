@@ -2,26 +2,48 @@
 
 namespace App\Http\Controllers;
 
-use App\Ai\Agents\ChatBot;
+use App\Ai\Services\ChatService;
 use Illuminate\Http\Request;
 
 class AIChatBot extends Controller
 {
-    //
-    public function index(){
+    public function __construct(
+        private ChatService $chatService
+    ) {
+    }
+
+    public function index()
+    {
         return view('chat');
     }
-    public function send(Request $request){
-        // validate
-        $request->validate([
-            "message" => "required|string"
-        ]);
-        // agen
-        $agen = new ChatBot();
-        $response = $agen->prompt($request->message);
-        return response()->json([
-            "status" => "success",
-            "message" => (string) $response
-        ]);
-    }
+
+    public function send(Request $request)
+{
+    //  dd("MASUK CONTROLLER");
+
+    $request->validate([
+
+    'message'=>'nullable|string',
+
+    'file'=>'nullable|file|max:10240'
+
+]);
+
+
+    $reply = $this->chatService
+->send(
+    $request->message,
+    $request->file('file')
+);
+
+
+    return response()->json([
+
+        'status'=>'success',
+
+        'message'=>$reply
+
+    ]);
+
+}
 }
