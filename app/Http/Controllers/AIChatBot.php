@@ -18,32 +18,31 @@ class AIChatBot extends Controller
     }
 
     public function send(Request $request)
-{
-    //  dd("MASUK CONTROLLER");
+    {
+        $request->validate([
+            'message' => 'nullable|string',
+            'file' => [
+    'nullable',
+    'file',
+    'max:10240',
+    'mimes:jpg,jpeg,png,gif,webp,
+          mp3,wav,m4a,
+          pdf,
+          doc,docx,
+          xls,xlsx,csv,
+          ppt,pptx,
+          txt',
+],
+        ]);
 
-    $request->validate([
+        $reply = $this->chatService->send(
+            $request->input('message'),
+            $request->file('file')
+        );
 
-    'message'=>'nullable|string',
-
-    'file'=>'nullable|file|max:10240'
-
-]);
-
-
-    $reply = $this->chatService
-->send(
-    $request->message,
-    $request->file('file')
-);
-
-
-    return response()->json([
-
-        'status'=>'success',
-
-        'message'=>$reply
-
-    ]);
-
-}
+        return response()->json([
+            'success' => true,
+            'message' => $reply,
+        ]);
+    }
 }

@@ -101,7 +101,7 @@
 
             <!-- Hidden Inputs -->
             <input id="imageInput" type="file" accept="image/*" class="hidden">
-            <input id="fileInput" type="file" accept=".pdf,.doc,.docx,.txt" class="hidden">
+            <input id="fileInput" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt" class="hidden">
             <input id="audioInput" type="file" accept="audio/*" class="hidden">
 
             <!-- Text Input -->
@@ -144,124 +144,283 @@
 </div>
 
 <script>
-
 const input = document.getElementById("chatInput");
 const button = document.getElementById("sendButton");
 const display = document.getElementById("chatDisplay");
 
-async function sendMessage(){
+const uploadButton = document.getElementById("uploadButton");
+const uploadMenu = document.getElementById("uploadMenu");
 
-    const message = input.value.trim();
+const imageInput = document.getElementById("imageInput");
+const fileInput = document.getElementById("fileInput");
+const audioInput = document.getElementById("audioInput");
 
-    if(message === "") return;
+const previewArea = document.getElementById("previewArea");
 
-    // User Bubble
-    display.insertAdjacentHTML("beforeend", `
-<div class="flex justify-end mb-4">
+let selectedFile = null;
 
-    <div class="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-md
-                shadow-md w-fit max-w-[380px]
-                text-[15px] leading-6 break-words">
-        ${message}
-    </div>
+// ================================
+// CSRF
+// ================================
 
-</div>
-`);
+const csrf = document
+    .querySelector('meta[name="csrf-token"]')
+    .getAttribute("content");
 
-    input.value = "";
+// ================================
+// Upload Menu
+// ================================
 
-    display.scrollTop = display.scrollHeight;
+uploadButton.addEventListener("click",(e)=>{
 
-    // Loading Bubble
-    display.insertAdjacentHTML("beforeend", `
-<div id="typing" class="flex items-end gap-3 mb-4">
+    e.stopPropagation();
 
-    <div class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-lg">
-        🤖
-    </div>
+    uploadMenu.classList.toggle("hidden");
 
-    <div class="bg-white border border-slate-200 px-4 py-2 rounded-2xl shadow-md text-gray-500 text-[15px]">
-        Rihana is typing...
-    </div>
+});
 
-</div>
-`);
+document.addEventListener("click",(e)=>{
 
-    display.scrollTop = display.scrollHeight;
-
-    try{
-
-        const response = await axios.post("/chat/send",{
-            message
-        });
-
-        document.getElementById("typing").remove();
-
-        display.insertAdjacentHTML("beforeend", `
-<div class="flex items-end gap-3 mb-4">
-
-    <div class="w-10 h-10 rounded-full bg-indigo-600 text-white
-                flex items-center justify-center text-lg">
-        🤖
-    </div>
-
-    <div class="bg-white border border-slate-200
-                px-4 py-2
-                rounded-2xl rounded-bl-md
-                shadow-md
-                w-fit
-                max-w-[380px]
-                text-[15px]
-                leading-6
-                break-words">
-
-        ${response.data.message}
-
-    </div>
-
-</div>
-`);
-
-    }catch(error){
-
-        document.getElementById("typing").remove();
-
-        display.insertAdjacentHTML("beforeend", `
-            <div class="flex justify-start">
-                <div class="max-w-[75%] bg-red-100 text-red-700 border border-red-300 rounded-2xl rounded-bl-md px-4 py-3 shadow">
-                    Failed to connect to AI.
-                </div>
-            </div>
-        `);
-
-        console.error(error);
-
+    if(
+        !uploadButton.contains(e.target) &&
+        !uploadMenu.contains(e.target)
+    ){
+        uploadMenu.classList.add("hidden");
     }
 
-    display.scrollTop = display.scrollHeight;
+});
+
+
+// ================================
+// Choose File
+// ================================
+
+imageInput.addEventListener("change",chooseFile);
+fileInput.addEventListener("change",chooseFile);
+audioInput.addEventListener("change",chooseFile);
+
+function chooseFile(e){
+
+    selectedFile = e.target.files[0];
+
+    if(!selectedFile) return;
+
+    console.log(selectedFile);
+
+    previewArea.classList.remove("hidden");
+
+    previewArea.innerHTML=`
+
+        <div class="bg-slate-100 rounded-xl p-3 flex justify-between items-center">
+
+            <div>
+
+                📎 ${selectedFile.name}
+
+            </div>
+
+            <button
+                class="text-red-500"
+                onclick="removeFile()">
+
+                ✕
+
+            </button>
+
+        </div>
+
+    `;
 
 }
 
-button.addEventListener("click", sendMessage);
+
+// ================================
+// Remove File
+// ================================
+
+window.removeFile=function(){
+
+    selectedFile=null;
+
+    imageInput.value="";
+    fileInput.value="";
+    audioInput.value="";
+
+    previewArea.classList.add("hidden");
+    previewArea.innerHTML="";
+
+}
+
+
+// ================================
+// Send Message
+// ================================
+
+async function sendMessage(){
+console.log("SEND MESSAGE DIPANGGIL");
+    const message=input.value.trim();
+
+    if(message==="" && !selectedFile){
+        return;
+    }
+
+
+    // User Bubble
+
+    display.insertAdjacentHTML("beforeend",`
+
+        <div class="flex justify-end mb-4">
+
+            <div class="bg-blue-600 text-white px-4 py-2 rounded-2xl rounded-br-md shadow-md max-w-[380px]">
+
+                ${message}
+
+                ${
+                    selectedFile
+                    ?
+
+                    `<div class="mt-2 text-xs opacity-80">
+                        📎 ${selectedFile.name}
+                    </div>`
+
+                    :
+
+                    ""
+                }
+
+            </div>
+
+        </div>
+
+    `);
+
+    input.value="";
+
+    display.scrollTop=display.scrollHeight;
+
+
+    // Loading
+
+    display.insertAdjacentHTML("beforeend",`
+
+        <div id="typing" class="flex items-end gap-3 mb-4">
+
+            <div class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+
+                🤖
+
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow px-4 py-2">
+
+                Rihana is typing...
+
+            </div>
+
+        </div>
+
+    `);
+
+    display.scrollTop=display.scrollHeight;
+
+
+    try{
+
+        const formData = new FormData();
+
+formData.append("message", message);
+
+if (selectedFile) {
+    formData.append("file", selectedFile);
+}
+
+        for (const pair of formData.entries()) {
+    console.log(pair[0], pair[1]);
+}
+
+        const csrfToken = document
+    .querySelector('meta[name="csrf-token"]')
+    .getAttribute('content');
+
+const response = await axios.post(
+    "/chat/send",
+    formData
+);
+console.log(response);
+console.log(typeof response.data);
+console.log(response.data);
+
+        console.log(response.data);
+
+        document.getElementById("typing")?.remove();
+
+        display.insertAdjacentHTML("beforeend",`
+
+            <div class="flex items-end gap-3 mb-4">
+
+                <div class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+
+                    🤖
+
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl rounded-bl-md shadow px-4 py-2 max-w-[380px]">
+
+                    ${response.data.message}
+
+                </div>
+
+            </div>
+
+        `);
+
+        removeFile();
+
+    }
+
+    catch(error){
+
+        console.error(error);
+
+        document.getElementById("typing")?.remove();
+
+        display.insertAdjacentHTML("beforeend",`
+
+            <div class="flex justify-start">
+
+                <div class="bg-red-100 border border-red-300 text-red-700 rounded-2xl px-4 py-2">
+
+                    Failed to connect to AI.
+
+                </div>
+
+            </div>
+
+        `);
+
+    }
+
+    display.scrollTop=display.scrollHeight;
+
+}
+
+
+// ================================
+// Events
+// ================================
+
+button.addEventListener("click",sendMessage);
 
 input.addEventListener("keypress",(e)=>{
+
     if(e.key==="Enter"){
+
         sendMessage();
-    }
-});
-const uploadButton = document.getElementById('uploadButton');
-const uploadMenu = document.getElementById('uploadMenu');
 
-uploadButton.addEventListener('click', (e) => {
-    e.stopPropagation();
-    uploadMenu.classList.toggle('hidden');
+    }
+
 });
 
-document.addEventListener('click', (e) => {
-    if (!uploadButton.contains(e.target) && !uploadMenu.contains(e.target)) {
-        uploadMenu.classList.add('hidden');
-    }
-});
 </script>
 
 </body>

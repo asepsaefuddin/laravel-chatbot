@@ -3,104 +3,123 @@
 namespace App\Ai\Services;
 
 use App\Ai\Agents\ChatBot;
+use Illuminate\Support\Facades\Log;
 
 class ChatService
 {
-     public function __construct(
-
+    public function __construct(
         private ConversationService $conversationService,
-
-        private UploadService $uploadService
-
+        private UploadService $uploadService,
+        private PdfService $pdfService
     ) {
     }
 
-    /**
-     * Kirim pesan ke AI.
-     */
     public function send(
-    ?string $message,
-    $file=null
-): string
-    {
-        // Ambil conversation aktif
+        ?string $message,
+        $file = null
+    ): string {
+
+        // =========================
+        // CONVERSATION
+        // =========================
+
         $conversation = $this->conversationService
             ->getCurrentConversation();
 
-        // Ambil history
         $history = $this->conversationService
             ->getHistory($conversation);
 
-        // Buat agent
-        if($file)
-{
+        $upload = null;
 
-    $upload =
-        $this->uploadService
-            ->upload($file);
+        // =========================
+        // ADA FILE
+        // =========================
 
+        if ($file) {
 
+            $upload = $this->uploadService
+                ->upload($file);
 
-    switch($upload['type'])
-    {
+            // =========================
+            // DOCUMENT
+            // =========================
 
+            if ($upload['type'] === 'document') {
 
-        case 'image':
+                $fullPath = storage_path(
+                    'app/public/' . $upload['path']
+                );
 
-            $reply =
-            "Ini gambar: ".$upload['path'];
+                // Baca isi PDF
+                $documentText = $this->pdfService
+                    ->extractText($fullPath);
 
-            break;
+                // Debug sementara
+                Log::info('PDF TEXT:', [
+    'text' => $documentText
+]);
 
+                $agent = new ChatBot($history);
 
+                $prompt = <<<PROMPT
+User mengunggah sebuah dokumen.
 
-        case 'audio':
+Nama file:
+{$upload['name']}
 
-            $reply =
-            "Ini audio: ".$upload['path'];
+Isi dokumen:
+{$documentText}
 
-            break;
+Pertanyaan user:
+{$message}
 
+Jawablah pertanyaan user berdasarkan isi dokumen tersebut.
+Jika informasi tidak ditemukan dalam dokumen, katakan bahwa informasi tersebut tidak ditemukan.
+PROMPT;
 
+                $reply = (string) $agent->prompt($prompt);
 
-        case 'document':
+            } else {
 
-            $reply =
-            "Ini dokumen: ".$upload['name'];
+                $reply = match ($upload['type']) {
 
-            break;
+                    'image' =>
+                        "Gambar berhasil diterima: {$upload['name']}",
 
+                    'audio' =>
+                        "Audio berhasil diterima: {$upload['name']}",
 
+                    default =>
+                        "File tidak didukung."
+                };
+            }
 
-        default:
+        } else {
 
-            $reply =
-            "File tidak didukung";
+            // =========================
+            // TANPA FILE
+            // =========================
 
-    }
+            $agent = new ChatBot($history);
 
+            $reply = (string) $agent->prompt($message);
+        }
 
-}
-else
-{
+        // =========================
+        // SAVE USER MESSAGE
+        // =========================
 
-    $agent = new ChatBot($history);
-
-
-    $reply =
-    (string) $agent->prompt($message);
-
-}
-
-        // Simpan pesan user
         $this->conversationService
-->saveUserMessage(
-    $conversation,
-    $message,
-    $upload ?? null
-);
+            ->saveUserMessage(
+                $conversation,
+                $message,
+                $upload
+            );
 
-        // Simpan balasan AI
+        // =========================
+        // SAVE AI MESSAGE
+        // =========================
+
         $this->conversationService
             ->saveAssistantMessage(
                 $conversation,
