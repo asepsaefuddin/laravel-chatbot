@@ -4,65 +4,87 @@ namespace App\Ai\Services;
 
 use App\Ai\Agents\ChatBot;
 use Illuminate\Support\Facades\Log;
+// use App\Ai\Agents\ChatBot;
+use App\Ai\Services\DocumentReaderService;
 
 class ChatService
 {
     public function __construct(
-        private ConversationService $conversationService,
-        private UploadService $uploadService,
-        private PdfService $pdfService
-    ) {
-    }
+
+    private ConversationService $conversationService,
+
+    private UploadService $uploadService,
+
+    private DocumentReaderService $documentReaderService
+
+) {
+}
 
     public function send(
-        ?string $message,
-        $file = null
-    ): string {
+    ?string $message,
+    $file = null
+): string {
 
-        // =========================
-        // CONVERSATION
-        // =========================
+    $conversation = $this->conversationService
+        ->getCurrentConversation();
 
-        $conversation = $this->conversationService
-            ->getCurrentConversation();
+    $history = $this->conversationService
+        ->getHistory($conversation);
 
-        $history = $this->conversationService
-            ->getHistory($conversation);
+    $upload = null;
 
-        $upload = null;
+    /*
+    |--------------------------------------------------------------------------
+    | ADA FILE
+    |--------------------------------------------------------------------------
+    */
 
-        // =========================
-        // ADA FILE
-        // =========================
+    if ($file) {
 
-        if ($file) {
+        $upload = $this->uploadService
+            ->upload($file);
 
-            $upload = $this->uploadService
-                ->upload($file);
+        /*
+        |--------------------------------------------------------------------------
+        | DOCUMENT
+        |--------------------------------------------------------------------------
+        */
 
-            // =========================
-            // DOCUMENT
-            // =========================
+        if (in_array($upload['type'], [
+            'pdf',
+            'word',
+            'excel',
+            'powerpoint',
+            'text'
+        ])) {
 
-            if ($upload['type'] === 'document') {
+            $documentText =
+                $this->documentReaderService
+                    ->read($file);
 
-                $fullPath = storage_path(
-                    'app/public/' . $upload['path']
-                );
+            /*
+            |--------------------------------------------------------------------------
+            | DEBUG
+            |--------------------------------------------------------------------------
+            */
 
-                // Baca isi PDF
-                $documentText = $this->pdfService
-                    ->extractText($fullPath);
+            \Illuminate\Support\Facades\Log::info(
+                'DOCUMENT TEXT',
+                [
+                    'file' => $upload['name'],
+                    'type' => $upload['type'],
+                    'text' => $documentText,
+                ]
+            );
 
-                // Debug sementara
-                Log::info('PDF TEXT:', [
-    'text' => $documentText
-]);
+            /*
+            |--------------------------------------------------------------------------
+            | Gabungkan isi file dengan pertanyaan user
+            |--------------------------------------------------------------------------
+            */
 
-                $agent = new ChatBot($history);
-
-                $prompt = <<<PROMPT
-User mengunggah sebuah dokumen.
+            $prompt = <<<PROMPT
+Saya memberikan sebuah dokumen kepada Anda.
 
 Nama file:
 {$upload['name']}
@@ -70,62 +92,99 @@ Nama file:
 Isi dokumen:
 {$documentText}
 
-Pertanyaan user:
+Pertanyaan pengguna:
 {$message}
 
-Jawablah pertanyaan user berdasarkan isi dokumen tersebut.
-Jika informasi tidak ditemukan dalam dokumen, katakan bahwa informasi tersebut tidak ditemukan.
+Jawablah pertanyaan pengguna berdasarkan isi dokumen tersebut.
+Jika informasi yang ditanyakan tidak terdapat di dokumen, katakan bahwa informasi tersebut tidak ditemukan.
 PROMPT;
-
-                $reply = (string) $agent->prompt($prompt);
-
-            } else {
-
-                $reply = match ($upload['type']) {
-
-                    'image' =>
-                        "Gambar berhasil diterima: {$upload['name']}",
-
-                    'audio' =>
-                        "Audio berhasil diterima: {$upload['name']}",
-
-                    default =>
-                        "File tidak didukung."
-                };
-            }
-
-        } else {
-
-            // =========================
-            // TANPA FILE
-            // =========================
 
             $agent = new ChatBot($history);
 
-            $reply = (string) $agent->prompt($message);
+            $reply = (string) $agent->prompt($prompt);
         }
 
-        // =========================
-        // SAVE USER MESSAGE
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | IMAGE
+        |--------------------------------------------------------------------------
+        */
 
-        $this->conversationService
-            ->saveUserMessage(
-                $conversation,
-                $message,
-                $upload
-            );
+        elseif ($upload['type'] === 'image') {
 
-        // =========================
-        // SAVE AI MESSAGE
-        // =========================
+            $reply =
+                "Gambar berhasil diupload: "
+                . $upload['name'];
+        }
 
-        $this->conversationService
-            ->saveAssistantMessage(
-                $conversation,
-                $reply
-            );
+        /*
+        |--------------------------------------------------------------------------
+        | AUDIO
+        |--------------------------------------------------------------------------
+        */
 
-        return $reply;
+        elseif ($upload['type'] === 'audio') {
+
+            $reply =
+                "Audio berhasil diupload: "
+                . $upload['name'];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILE TIDAK DIDUKUNG
+        |--------------------------------------------------------------------------
+        */
+
+        else {
+
+            $reply =
+                "File berhasil diupload, tetapi "
+                . "jenis file tersebut belum didukung.";
+        }
+
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TANPA FILE
+    |--------------------------------------------------------------------------
+    */
+
+    else {
+
+        $agent = new ChatBot($history);
+
+        $reply = (string) $agent->prompt(
+            $message
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIMPAN PESAN USER
+    |--------------------------------------------------------------------------
+    */
+
+    $this->conversationService
+        ->saveUserMessage(
+            $conversation,
+            $message,
+            $upload
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIMPAN JAWABAN AI
+    |--------------------------------------------------------------------------
+    */
+
+    $this->conversationService
+        ->saveAssistantMessage(
+            $conversation,
+            $reply
+        );
+
+    return $reply;
+}
 }

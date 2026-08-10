@@ -390,7 +390,7 @@ console.log(response.data);
 
                 <div class="bg-red-100 border border-red-300 text-red-700 rounded-2xl px-4 py-2">
 
-                    Failed to connect to AI.
+                    ${error.response.data.error ?? "Terjadi error"}
 
                 </div>
 
