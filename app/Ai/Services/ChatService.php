@@ -4,86 +4,63 @@ namespace App\Ai\Services;
 
 use App\Ai\Agents\ChatBot;
 use Illuminate\Support\Facades\Log;
-// use App\Ai\Agents\ChatBot;
 use App\Ai\Services\DocumentReaderService;
+use Illuminate\Support\Facades\Http;
 
 class ChatService
 {
     public function __construct(
+        private ConversationService $conversationService,
+        private UploadService $uploadService,
+        private DocumentReaderService $documentReaderService
+    ) {
+    }
 
-    private ConversationService $conversationService,
+    public function send(?string $message = null, $file = null): string
+    {
+        set_time_limit(120);
 
-    private UploadService $uploadService,
+    // Mengatur timeout Guzzle HTTP Client agar fleksibel saat memproses file
+    Http::globalOptions([
+        'timeout' => 120,         // Batas total waktu menunggu respon
+        'connect_timeout' => 15,  // Batas waktu mencoba koneksi ke Google
+    ]);
+        $conversation = $this->conversationService->getCurrentConversation();
+        $history = $this->conversationService->getHistory($conversation);
 
-    private DocumentReaderService $documentReaderService
-
-) {
-}
-
-    public function send(
-    ?string $message,
-    $file = null
-): string {
-
-    $conversation = $this->conversationService
-        ->getCurrentConversation();
-
-    $history = $this->conversationService
-        ->getHistory($conversation);
-
-    $upload = null;
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADA FILE
-    |--------------------------------------------------------------------------
-    */
-
-    if ($file) {
-
-        $upload = $this->uploadService
-            ->upload($file);
+        $upload = null;
+        
+        $cleanMessage = trim((string) $message);
+        $hasCustomMessage = !empty($cleanMessage);
 
         /*
         |--------------------------------------------------------------------------
-        | DOCUMENT
+        | ADA FILE
         |--------------------------------------------------------------------------
         */
+        if ($file) {
+            $upload = $this->uploadService->upload($file);
 
-        if (in_array($upload['type'], [
-            'pdf',
-            'word',
-            'excel',
-            'powerpoint',
-            'text'
-        ])) {
-
-            $documentText =
-                $this->documentReaderService
-                    ->read($file);
+            $extension = strtolower($file->getClientOriginalExtension());
+            $documentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx', 'txt'];
 
             /*
             |--------------------------------------------------------------------------
-            | DEBUG
+            | DOKUMEN (PDF, Word, Excel, PPT, Text)
             |--------------------------------------------------------------------------
             */
+            if (in_array($extension, $documentExtensions) || in_array($upload['type'] ?? '', ['pdf', 'word', 'excel', 'powerpoint', 'text'])) {
 
-            \Illuminate\Support\Facades\Log::info(
-                'DOCUMENT TEXT',
-                [
-                    'file' => $upload['name'],
-                    'type' => $upload['type'],
-                    'text' => $documentText,
-                ]
-            );
+                $documentText = $this->documentReaderService->read($file);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Gabungkan isi file dengan pertanyaan user
-            |--------------------------------------------------------------------------
-            */
+                Log::info('DOCUMENT TEXT READ', [
+                    'file' => $upload['name'] ?? $file->getClientOriginalName(),
+                    'extension' => $extension,
+                    'text_length' => strlen($documentText),
+                ]);
 
-            $prompt = <<<PROMPT
+                if ($hasCustomMessage) {
+                    $prompt = <<<PROMPT
 Saya memberikan sebuah dokumen kepada Anda.
 
 Nama file:
@@ -93,98 +70,97 @@ Isi dokumen:
 {$documentText}
 
 Pertanyaan pengguna:
-{$message}
+{$cleanMessage}
 
-Jawablah pertanyaan pengguna berdasarkan isi dokumen tersebut.
+Jawablah pertanyaan pengguna berdasarkan isi dokumen tersebut. 
 Jika informasi yang ditanyakan tidak terdapat di dokumen, katakan bahwa informasi tersebut tidak ditemukan.
 PROMPT;
+                } else {
+                    $prompt = <<<PROMPT
+Saya memberikan sebuah dokumen kepada Anda tanpa instruksi khusus.
+
+Nama file:
+{$upload['name']}
+
+Isi dokumen:
+{$documentText}
+
+Tugas Anda:
+1. Berikan ringkasan dan deskripsi singkat mengenai isi dokumen ini.
+2. Jelaskan poin-poin penting utama yang dibahas di dalamnya.
+PROMPT;
+                }
+
+                $agent = new ChatBot($history);
+                $reply = (string) $agent->prompt($prompt);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | GAMBAR (GEMINI VISION VIA LARAVEL AI SDK)
+            |--------------------------------------------------------------------------
+            */
+            elseif (($upload['type'] ?? '') === 'image' || in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+
+                $promptText = $hasCustomMessage 
+                    ? $cleanMessage 
+                    : "Deskripsikan gambar ini secara detail dan sebutkan poin-poin penting yang ada di dalamnya.";
+
+                $agent = new ChatBot($history);
+
+                // Memanggil method promptWithImage langsung dari ChatBot
+                $reply = (string) $agent->promptWithImage(
+                    prompt: $promptText,
+                    imagePath: $file->getRealPath()
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUDIO & LAINNYA
+            |--------------------------------------------------------------------------
+            */
+            elseif (($upload['type'] ?? '') === 'audio') {
+                $reply = "Audio berhasil diupload: " . $upload['name'];
+            } else {
+                $reply = "File berhasil diupload, tetapi jenis file (.{$extension}) belum didukung.";
+            }
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | TANPA FILE
+        |--------------------------------------------------------------------------
+        */
+        else {
+            if (!$hasCustomMessage) {
+                return "Silakan ketik pesan atau upload dokumen terlebih dahulu.";
+            }
 
             $agent = new ChatBot($history);
-
-            $reply = (string) $agent->prompt($prompt);
+            $reply = (string) $agent->prompt($cleanMessage);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | IMAGE
+        | SIMPAN PESAN KE RIWAYAT
         |--------------------------------------------------------------------------
         */
+        $fileName = $upload['name'] ?? 'Dokumen';
+        $userSavedText = $hasCustomMessage ? $cleanMessage : "[Mengirim File: {$fileName}]";
 
-        elseif ($upload['type'] === 'image') {
-
-            $reply =
-                "Gambar berhasil diupload: "
-                . $upload['name'];
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | AUDIO
-        |--------------------------------------------------------------------------
-        */
-
-        elseif ($upload['type'] === 'audio') {
-
-            $reply =
-                "Audio berhasil diupload: "
-                . $upload['name'];
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | FILE TIDAK DIDUKUNG
-        |--------------------------------------------------------------------------
-        */
-
-        else {
-
-            $reply =
-                "File berhasil diupload, tetapi "
-                . "jenis file tersebut belum didukung.";
-        }
-
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | TANPA FILE
-    |--------------------------------------------------------------------------
-    */
-
-    else {
-
-        $agent = new ChatBot($history);
-
-        $reply = (string) $agent->prompt(
-            $message
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | SIMPAN PESAN USER
-    |--------------------------------------------------------------------------
-    */
-
-    $this->conversationService
-        ->saveUserMessage(
+        $this->conversationService->saveUserMessage(
             $conversation,
-            $message,
+            $userSavedText,
             $upload
         );
 
-    /*
-    |--------------------------------------------------------------------------
-    | SIMPAN JAWABAN AI
-    |--------------------------------------------------------------------------
-    */
-
-    $this->conversationService
-        ->saveAssistantMessage(
+        $this->conversationService->saveAssistantMessage(
             $conversation,
             $reply
         );
 
-    return $reply;
-}
+        return $reply;
+    }
 }
