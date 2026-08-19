@@ -404,6 +404,91 @@ input.addEventListener("keypress", (e) => {
         sendMessage();
     }
 });
+// ================================
+// Voice Input (Speech Recognition - Toggle Stop & Change Icon)
+// ================================
+const voiceButton = document.getElementById("voiceButton");
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = "id-ID";
+    recognition.interimResults = true; // Menampilkan teks saat bicara
+    recognition.continuous = true;     // Merekam kalimat panjang
+
+    let isListening = false;
+    let finalTranscript = "";
+
+    voiceButton.addEventListener("click", () => {
+        if (!isListening) {
+            // MULAI MEREKAM
+            isListening = true;
+            finalTranscript = input.value; // Pertahankan teks yang sudah ada
+            
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error("Gagal memulai perekaman:", e);
+            }
+        } else {
+            // BERHENTI MEREKAM (Dihentikan manual oleh user)
+            isListening = false;
+            recognition.stop();
+        }
+    });
+
+    recognition.onstart = () => {
+        // Ganti tampilan tombol menjadi ikon STOP ⏹️ warna merah berdenyut
+        voiceButton.innerHTML = "⏹️";
+        voiceButton.classList.add("bg-red-100", "text-red-600", "animate-pulse");
+        input.placeholder = "Merekam suara... Klik tombol STOP untuk berhenti.";
+    };
+
+    recognition.onresult = (event) => {
+        let interimTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript + " ";
+            } else {
+                interimTranscript += event.results[i][0].transcript;
+            }
+        }
+
+        // Tampilkan teks final + kata sementara di kolom input
+        input.value = finalTranscript + interimTranscript;
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech Recognition Error:", event.error);
+        if (event.error === "not-allowed") {
+            alert("Akses mikrofon ditolak. Silakan izinkan akses mikrofon di pengaturan browser.");
+        }
+        isListening = false;
+    };
+
+    recognition.onend = () => {
+        // Kembalikan tampilan tombol ke ikon Mikrofon 🎤 semula
+        voiceButton.innerHTML = "🎤";
+        voiceButton.classList.remove("bg-red-100", "text-red-600", "animate-pulse");
+        input.placeholder = "Message Rihana AI...";
+
+        // Hanya restart otomatis jika koneksi terputus tiba-tiba BUKAN karena di-stop user
+        if (isListening) {
+            try {
+                recognition.start();
+            } catch (e) {
+                isListening = false;
+            }
+        }
+    };
+
+} else {
+    voiceButton.addEventListener("click", () => {
+        alert("Fitur Voice Input tidak didukung oleh browser ini. Gunakan Google Chrome atau Edge.");
+    });
+}
 </script>
 
 </body>

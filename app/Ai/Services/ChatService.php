@@ -120,11 +120,26 @@ PROMPT;
             | AUDIO & LAINNYA
             |--------------------------------------------------------------------------
             */
-            elseif (($upload['type'] ?? '') === 'audio') {
-                $reply = "Audio berhasil diupload: " . $upload['name'];
-            } else {
-                $reply = "File berhasil diupload, tetapi jenis file (.{$extension}) belum didukung.";
-            }
+            /*
+|--------------------------------------------------------------------------
+| AUDIO (GEMINI MULTIMODAL AUDIO)
+|--------------------------------------------------------------------------
+*/
+elseif (($upload['type'] ?? '') === 'audio' || in_array($extension, ['mp3', 'wav', 'ogg', 'm4a', 'aac'])) {
+
+    // 1. Tentukan prompt default jika user tidak mengetikkan pesan khusus
+    $promptText = $hasCustomMessage 
+        ? $cleanMessage 
+        : "Dengarkan file audio ini. Transkripsikan stands teksnya secara akurat dan berikan rangkuman mengenai isi pembicaraan di dalam audio tersebut.";
+
+    $agent = new ChatBot($history);
+
+    // 2. Panggil promptWithAudio dengan path file real
+    $reply = (string) $agent->promptWithAudio(
+        prompt: $promptText,
+        audioPath: $file->getRealPath()
+    );
+}
 
         }
 

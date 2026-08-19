@@ -26,6 +26,10 @@ class AIChatBot extends Controller
                 'message' => 'nullable|string',
                 'file' => 'nullable|file|max:10240',
             ]);
+            // $request->validate([
+            // 'message' => 'nullable|string',
+            //  'file'    => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,jpeg,jpg,png,webp,mp3,wav,ogg,m4a,aac|max:10240', // Maks 10MB
+            // ]);
 
             $file = $request->file('file');
 
