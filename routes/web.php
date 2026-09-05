@@ -19,6 +19,7 @@ Route::get('/', function () {
 
 Route::get('/chat', [AIChatBot::class, 'index'])->name('chat');
 Route::post('/chat/send', [AIChatBot::class, 'send'])->name('chat.send');
+Route::get('/login', [AIChatBot::class, 'login'])->name('login');
 // Route::post('/chat/send', function (Request $request) {
 
 //     return response()->json([

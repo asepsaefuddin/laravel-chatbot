@@ -114,6 +114,24 @@ PROMPT;
                     imagePath: $file->getRealPath()
                 );
             }
+            /*
+|--------------------------------------------------------------------------
+| VIDEO (GEMINI MULTIMODAL VIDEO)
+|--------------------------------------------------------------------------
+*/
+elseif (($upload['type'] ?? '') === 'video' || in_array($extension, ['mp4', 'mov', 'avi', 'webm', 'mkv'])) {
+
+    $promptText = $hasCustomMessage 
+        ? $cleanMessage 
+        : "Tonton dan analisis video ini. Berikan deskripsi singkat mengenai isi video serta sebutkan kejadian atau poin penting di dalamnya.";
+
+    $agent = new ChatBot($history);
+
+    $reply = (string) $agent->promptWithVideo(
+        prompt: $promptText,
+        videoPath: $file->getRealPath()
+    );
+}
 
             /*
             |--------------------------------------------------------------------------

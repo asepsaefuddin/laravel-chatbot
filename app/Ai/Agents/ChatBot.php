@@ -9,6 +9,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Files\Image;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Files\Audio;
+use Laravel\Ai\Files\Video;
 use Laravel\Ai\Promptable;
 use Stringable;
 
@@ -74,6 +75,13 @@ class ChatBot implements Agent, Conversational, HasTools
             attachments: [
                 Audio::fromPath($audioPath)
             ]
+        );
+    }
+    public function promptWithVideo(string $prompt, string $videoPath)
+    {
+        return $this->prompt(
+            prompt: $prompt,
+            attachments: [Video::fromPath($videoPath)]
         );
     }
 }
